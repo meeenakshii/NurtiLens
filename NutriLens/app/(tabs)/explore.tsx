@@ -1,112 +1,217 @@
-import { Image } from 'expo-image';
-import { Platform, StyleSheet } from 'react-native';
+// ...rest of your imports
+import React, { useEffect, useRef, useState } from "react";
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  Alert,
+  Image,
+  ActivityIndicator,
+  Animated,
+} from "react-native";
+import { CameraView, useCameraPermissions } from "expo-camera";
+import * as ImageManipulator from "expo-image-manipulator";
 
-import { Collapsible } from '@/components/ui/collapsible';
-import { ExternalLink } from '@/components/external-link';
-import ParallaxScrollView from '@/components/parallax-scroll-view';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { IconSymbol } from '@/components/ui/icon-symbol';
-import { Fonts } from '@/constants/theme';
+export default function ExploreScreen() {
+  const [permission, requestPermission] = useCameraPermissions();
+  const [cameraReady, setCameraReady] = useState(false);
+  const [capturedPhoto, setCapturedPhoto] = useState<string | null>(null);
+  const [result, setResult] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const cameraRef = useRef<any>(null);
 
-export default function TabTwoScreen() {
+  const flashAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    if (!permission?.granted) requestPermission();
+  }, [permission]);
+
+  const animateFlash = () => {
+    flashAnim.setValue(0.8);
+    Animated.timing(flashAnim, {
+      toValue: 0,
+      duration: 300,
+      useNativeDriver: true,
+    }).start();
+  };
+
+  if (!permission) return <View />;
+  if (!permission.granted)
+    return (
+      <View style={styles.center}>
+        <Text style={styles.text}>We need your permission to access camera</Text>
+        <TouchableOpacity style={styles.button} onPress={requestPermission}>
+          <Text style={styles.buttonText}>Grant Permission</Text>
+        </TouchableOpacity>
+      </View>
+    );
+
+  const takePhoto = async () => {
+    if (cameraRef.current && cameraReady) {
+      try {
+        animateFlash();
+        const photo = await cameraRef.current.takePictureAsync();
+        setCapturedPhoto(photo.uri);
+        analyzePhoto(photo.uri);
+      } catch (err) {
+        Alert.alert("Error", "Failed to take picture");
+      }
+    }
+  };
+
+  const analyzePhoto = async (uri: string) => {
+    setLoading(true);
+    try {
+      // Resize and compress image
+      await ImageManipulator.manipulateAsync(
+        uri,
+        [{ resize: { width: 300 } }],
+        { compress: 0.7, format: ImageManipulator.SaveFormat.JPEG }
+      );
+
+      setTimeout(() => {
+        setResult("🥔 Detected: Lay’s Potato Chips\n⚠️ High in Sodium and Trans Fats");
+        setLoading(false);
+      }, 1500);
+    } catch (e) {
+      Alert.alert("Error", "Unable to analyze image");
+      setLoading(false);
+    }
+  };
+
+  const retakePhoto = () => {
+    setCapturedPhoto(null);
+    setResult(null);
+  };
+
   return (
-    <ParallaxScrollView
-      headerBackgroundColor={{ light: '#D0D0D0', dark: '#353636' }}
-      headerImage={
-        <IconSymbol
-          size={310}
-          color="#808080"
-          name="chevron.left.forwardslash.chevron.right"
-          style={styles.headerImage}
-        />
-      }>
-      <ThemedView style={styles.titleContainer}>
-        <ThemedText
-          type="title"
-          style={{
-            fontFamily: Fonts.rounded,
-          }}>
-          Explore
-        </ThemedText>
-      </ThemedView>
-      <ThemedText>This app includes example code to help you get started.</ThemedText>
-      <Collapsible title="File-based routing">
-        <ThemedText>
-          This app has two screens:{' '}
-          <ThemedText type="defaultSemiBold">app/(tabs)/index.tsx</ThemedText> and{' '}
-          <ThemedText type="defaultSemiBold">app/(tabs)/explore.tsx</ThemedText>
-        </ThemedText>
-        <ThemedText>
-          The layout file in <ThemedText type="defaultSemiBold">app/(tabs)/_layout.tsx</ThemedText>{' '}
-          sets up the tab navigator.
-        </ThemedText>
-        <ExternalLink href="https://docs.expo.dev/router/introduction">
-          <ThemedText type="link">Learn more</ThemedText>
-        </ExternalLink>
-      </Collapsible>
-      <Collapsible title="Android, iOS, and web support">
-        <ThemedText>
-          You can open this project on Android, iOS, and the web. To open the web version, press{' '}
-          <ThemedText type="defaultSemiBold">w</ThemedText> in the terminal running this project.
-        </ThemedText>
-      </Collapsible>
-      <Collapsible title="Images">
-        <ThemedText>
-          For static images, you can use the <ThemedText type="defaultSemiBold">@2x</ThemedText> and{' '}
-          <ThemedText type="defaultSemiBold">@3x</ThemedText> suffixes to provide files for
-          different screen densities
-        </ThemedText>
-        <Image
-          source={require('@/assets/images/react-logo.png')}
-          style={{ width: 100, height: 100, alignSelf: 'center' }}
-        />
-        <ExternalLink href="https://reactnative.dev/docs/images">
-          <ThemedText type="link">Learn more</ThemedText>
-        </ExternalLink>
-      </Collapsible>
-      <Collapsible title="Light and dark mode components">
-        <ThemedText>
-          This template has light and dark mode support. The{' '}
-          <ThemedText type="defaultSemiBold">useColorScheme()</ThemedText> hook lets you inspect
-          what the user&apos;s current color scheme is, and so you can adjust UI colors accordingly.
-        </ThemedText>
-        <ExternalLink href="https://docs.expo.dev/develop/user-interface/color-themes/">
-          <ThemedText type="link">Learn more</ThemedText>
-        </ExternalLink>
-      </Collapsible>
-      <Collapsible title="Animations">
-        <ThemedText>
-          This template includes an example of an animated component. The{' '}
-          <ThemedText type="defaultSemiBold">components/HelloWave.tsx</ThemedText> component uses
-          the powerful{' '}
-          <ThemedText type="defaultSemiBold" style={{ fontFamily: Fonts.mono }}>
-            react-native-reanimated
-          </ThemedText>{' '}
-          library to create a waving hand animation.
-        </ThemedText>
-        {Platform.select({
-          ios: (
-            <ThemedText>
-              The <ThemedText type="defaultSemiBold">components/ParallaxScrollView.tsx</ThemedText>{' '}
-              component provides a parallax effect for the header image.
-            </ThemedText>
-          ),
-        })}
-      </Collapsible>
-    </ParallaxScrollView>
+    <View style={styles.container}>
+      {!capturedPhoto ? (
+        <>
+          <CameraView
+            style={styles.camera}
+            ref={cameraRef}
+            onCameraReady={() => setCameraReady(true)}
+          />
+
+          {/* Camera overlay frame */}
+          <View style={styles.overlayFrame} />
+
+          {/* Flash effect */}
+          <Animated.View
+            pointerEvents="none"
+            style={[styles.flashOverlay, { opacity: flashAnim }]}
+          />
+
+          {/* Preview Info Panel */}
+          <View style={styles.previewPanel}>
+            <Text style={styles.previewText}>📸 Center the object in frame</Text>
+            <Text style={styles.previewText}>✋ Hold steady for best results</Text>
+          </View>
+        </>
+      ) : (
+        <Image source={{ uri: capturedPhoto }} style={styles.preview} />
+      )}
+
+      {loading && (
+        <View style={styles.overlay}>
+          <ActivityIndicator size="large" color="#fff" />
+          <Text style={styles.overlayText}>Analyzing...</Text>
+        </View>
+      )}
+
+      {result && !loading && (
+        <View style={styles.resultBox}>
+          <Text style={styles.resultText}>{result}</Text>
+          <TouchableOpacity onPress={retakePhoto} style={styles.retakeBtn}>
+            <Text style={styles.retakeText}>🔄 Retake</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
+      {!capturedPhoto && (
+        <TouchableOpacity style={styles.captureButton} onPress={takePhoto}>
+          <Text style={styles.captureText}>📸</Text>
+        </TouchableOpacity>
+      )}
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  headerImage: {
-    color: '#808080',
-    bottom: -90,
-    left: -35,
-    position: 'absolute',
+  container: { flex: 1, backgroundColor: "#000" },
+  camera: { flex: 1 },
+  preview: { flex: 1, resizeMode: "cover" },
+  captureButton: {
+    position: "absolute",
+    bottom: 40,
+    alignSelf: "center",
+    backgroundColor: "#fff",
+    padding: 20,
+    borderRadius: 50,
+    elevation: 5,
   },
-  titleContainer: {
-    flexDirection: 'row',
-    gap: 8,
+  captureText: { fontSize: 24 },
+  overlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "#0009",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  overlayText: { color: "#fff", marginTop: 10, fontSize: 16 },
+  resultBox: {
+    position: "absolute",
+    top: 60,
+    alignSelf: "center",
+    backgroundColor: "#ffffffee",
+    padding: 16,
+    borderRadius: 12,
+    alignItems: "center",
+    maxWidth: "90%",
+  },
+  resultText: { fontWeight: "bold", fontSize: 16, textAlign: "center" },
+  retakeBtn: {
+    marginTop: 10,
+    backgroundColor: "#2b9348",
+    paddingVertical: 8,
+    paddingHorizontal: 20,
+    borderRadius: 8,
+  },
+  retakeText: { color: "#fff", fontWeight: "bold" },
+  text: { color: "#333", textAlign: "center", marginBottom: 20 },
+  button: {
+    backgroundColor: "#2b9348",
+    paddingVertical: 12,
+    paddingHorizontal: 30,
+    borderRadius: 10,
+  },
+  buttonText: { color: "#fff", fontWeight: "bold", fontSize: 16 },
+  center: { flex: 1, justifyContent: "center", alignItems: "center" },
+  overlayFrame: {
+    ...StyleSheet.absoluteFillObject,
+    borderWidth: 2,
+    borderColor: "#fff6",
+    margin: 20,
+    borderRadius: 12,
+  },
+  flashOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "#fff",
+  },
+  previewPanel: {
+    position: "absolute",
+    top: 50,
+    alignSelf: "center",
+    backgroundColor: "#0007",
+    padding: 10,
+    borderRadius: 8,
+    alignItems: "center",
+  },
+  previewText: {
+    color: "#fff",
+    fontSize: 14,
+    textAlign: "center",
   },
 });
+
